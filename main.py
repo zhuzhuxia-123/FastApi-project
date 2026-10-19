@@ -1,11 +1,10 @@
 from datetime import datetime
-from turtle import st
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import DateTime, Integer, Select, String, delete, func, select
+from sqlalchemy import DateTime, Integer, Select, String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -135,13 +134,14 @@ class Base(DeclarativeBase):
         comment="更新时间",
     )
 
-#继承base相当于Book是orm对象
+
+# 继承base相当于Book是orm对象
 class Book(Base):
     __tablename__ = "book"
     id: Mapped[int] = mapped_column(primary_key=True, comment="书籍id")
     book_name: Mapped[str] = mapped_column(String(255), comment="书名")
     author: Mapped[str] = mapped_column(String(255), comment="作者")
-    price: Mapped[int] = mapped_column(Integer,comment="价格")
+    price: Mapped[int] = mapped_column(Integer, comment="价格")
     publisher: Mapped[str] = mapped_column(String(255), comment="出版社")
 
 
@@ -164,6 +164,7 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,  # 提交后会话不过期，不会重新查询数据库
 )
 
+
 async def get_database():
     async with AsyncSessionLocal() as session:
         try:
@@ -175,102 +176,111 @@ async def get_database():
         finally:
             await session.close()  # 关闭会话
 
+
 @app.get("/book/books")
 async def get_book_list(db: AsyncSession = Depends(get_database)):
     # 数据库查询功能
     result = await db.execute(select(Book))  # result是查询出来的orm结果
-    books = result.scalars().all() #查询全部条数据
+    books = result.scalars().all()  # 查询全部条数据
     # books = result.scalars().first() #查询一条数据
     # books = db.get(Book, 5) #按特定的下标数据
     return books
 
+
 @app.get("/book/get_book/{book_id}")
-async def get_book_by_id(book_id: int , db: AsyncSession = Depends(get_database)):
+async def get_book_by_id(book_id: int, db: AsyncSession = Depends(get_database)):
     result = await db.execute(Select(Book).where(Book.id == book_id))
     book = result.scalar_one_or_none()
     return book
+
 
 @app.get("/book")
 async def search_book(db: AsyncSession = Depends(get_database)):
     # result = await db.execute(select(Book).where(Book.price >= 40))
     # result = await db.execute(select(Book).where(Book.author.like("余%") & Book.price >= 35))#模糊查询
-    id_list = [1,3,5,7]
+    id_list = [1, 3, 5, 7]
     result = await db.execute(select(Book).where(Book.id.in_(id_list)))
     books = result.scalars().all()
     return books
 
-#聚合查询
+
+# 聚合查询
 @app.post("/book/count")
-async def get_count(db:AsyncSession = Depends(get_database)):
+async def get_count(db: AsyncSession = Depends(get_database)):
     result = await db.execute(select(func.max(Book.price)))
-    num = result.scalar()#提取一个数值 -》 标量值
+    num = result.scalar()  # 提取一个数值 -》 标量值
     return num
+
 
 @app.get("/book/book_list")
 async def get_book_l(
-    page:int = Query(default=1, ge=1),
-    page_size:int = Query(default=3, ge=1, le=100),
-    db:AsyncSession = Depends(get_database)
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=3, ge=1, le=100),
+    db: AsyncSession = Depends(get_database),
 ):
-    skip = (page - 1)*page_size
-    #offset跳过的记录数 ， limit 每页的数量
+    skip = (page - 1) * page_size
+    # offset跳过的记录数 ， limit 每页的数量
     stmt = select(Book).offset(skip).limit(page_size)
     result = await db.execute(stmt)
     books = result.scalars().all()
     return books
 
-#新增图书信息，用户输入 -》 参数 -》 请求体
-#BookEntity      ORM实体（数据库）
+
+# 新增图书信息，用户输入 -》 参数 -》 请求体
+# BookEntity      ORM实体（数据库）
 # BookCreateInput  新增入参（前端传过来）
 # BookUpdateInput  修改入参
 # BookOutput       单条查询返回
 # BookPageOutput   分页列表返回
 class BookCreateSchema(BaseModel):
-    id:int
-    book_name:str
-    author:str
-    price:int
-    publisher:str
+    id: int
+    book_name: str
+    author: str
+    price: int
+    publisher: str
+
 
 class BookUpdateSchema(BaseModel):
-    book_name:str
-    author:str
-    price:int
-    publisher:str
+    book_name: str
+    author: str
+    price: int
+    publisher: str
+
 
 @app.post("/book/add_book")
-async def add_book(book:BookCreateSchema,db:AsyncSession = Depends(get_database)):
-    #创建orm对象 -> add -> commit
+async def add_book(book: BookCreateSchema, db: AsyncSession = Depends(get_database)):
+    # 创建orm对象 -> add -> commit
     book_obj = Book(**book.__dict__)
     db.add(book_obj)
     await db.commit()
     return book
 
-#修改图书信息
+
+# 修改图书信息
 @app.put("/book/update_book/{book_id}")
-async def update_book(book_id:int ,data:BookUpdateSchema,db:AsyncSession = Depends(get_database)):
-    db_book = await db.get(Book,book_id) #session跟踪这个对话的变化，已经创建orm对象
+async def update_book(
+    book_id: int, data: BookUpdateSchema, db: AsyncSession = Depends(get_database)
+):
+    db_book = await db.get(Book, book_id)  # session跟踪这个对话的变化，已经创建orm对象
     if db_book is None:
-        raise HTTPException(
-            status_code=404,
-            detail="查无此书"
-        )
+        raise HTTPException(status_code=404, detail="查无此书")
 
     db_book.book_name = data.book_name
     db_book.author = data.author
     db_book.price = data.price
     db_book.publisher = data.publisher
 
-    await db.commit()#提交的是这个session会话
+    await db.commit()  # 提交的是这个session会话
     return db_book
 
-#删除图书
+
+# 删除图书
 @app.delete("/book/delete_book/{book_id}")
-async def delete_book(book_id: int,db:AsyncSession = Depends(get_database)):
-    #先查再删 提交
-    db_book = await db.get(Book,book_id)
+async def delete_book(book_id: int, db: AsyncSession = Depends(get_database)):
+    # 先查再删 提交
+    db_book = await db.get(Book, book_id)
     if db_book is None:
-        raise HTTPException(status_code=404,detail="书籍不存在")
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
     await db.delete(db_book)
     await db.commit()
