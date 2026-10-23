@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import news
+from routers import news, users
 
 app = FastAPI()
 
+# 解决跨域问题
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 允许所有来源,开发阶段允许，部署后建议指定域名
@@ -19,3 +20,4 @@ async def root():
 
 
 app.include_router(news.router)
+app.include_router(users.router)
