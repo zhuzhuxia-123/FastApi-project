@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import news, users
+from utils.exception_handlers import register_exception_handlers
 
 app = FastAPI()
+#注册全局异常处理器
+register_exception_handlers(app)
 
 # 解决跨域问题
 app.add_middleware(
